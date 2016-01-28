@@ -1,32 +1,20 @@
 {
-  "qos": {
+  "topic": {
 	"type": "String",
-	"label": "QOS",
-	"enum": ["0", "1", "2"],
-	"default": "0",
-	"help": "The QOS to be used for message exchanges. Default: 0"
+	"label": "Topic",
+	"default": "libelium/data",
+	"help": "The topic to listen to for device data. Default libelium/data"
   },
-  "data_topic": {
+  "user": {
 	"type": "String",
-	"label": "Data Topic",
-	"default": "reekoh/data",
-	"help": "The topic to listen to for device data. Default reekoh/data"
+	"label": "Username",
+	"requied": true,
+	"help": "The username to use to authenticate incoming traffic."
   },
-  "message_topic": {
-	"type": "String",
-	"label": "Message Topic",
-	"default": "reekoh/messages",
-	"help": "The topic to listen to for device messages or commands. Default: reekoh/messages"
-  },
-  "groupmessage_topic": {
-	"type": "String",
-	"label": "Group Message Topic",
-	"default": "reekoh/groupmessages",
-	"help": "The topic to listen to for group messages or commands. Default: reekoh/groupmessages"
-  },
-  "authorized_topics": {
-	"type": "String",
-	"label": "Authorized Topics",
-	"help": "Other authorized topics the devices can subscribe from and/or publish to."
+  "password": {
+	"type": "Password",
+	"label": "Password",
+	"requied": true,
+	"help": "The password to use to authenticate incoming traffic."
   }
 }
