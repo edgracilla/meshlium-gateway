@@ -1,8 +1,11 @@
 'use strict';
 
 const PORT       = 8000,
-	  DEVICE_ID1 = '567827489028375',
-	  DEVICE_ID2 = '567827489028376';
+	  TOPIC      = 'hello/world',
+	  USER       = 'hello',
+	  PASSWORD   = 'world',
+	  DEVICE_ID1 = 'AGP_1',
+	  DEVICE_ID2 = 'AGP_2';
 
 var cp     = require('child_process'),
 	mqtt   = require('mqtt'),
@@ -48,7 +51,9 @@ describe('Gateway', function () {
 				data: {
 					options: {
 						port: PORT,
-						qos: 0
+						topic: TOPIC,
+						user: USER,
+						password: PASSWORD
 					},
 					devices: [{_id: DEVICE_ID1}, {_id: DEVICE_ID2}]
 				}
@@ -61,11 +66,19 @@ describe('Gateway', function () {
 	describe('#connections', function () {
 		it('should accept connections', function (done) {
 			mqttClient1 = mqtt.connect('mqtt://localhost' + ':' + PORT, {
-				clientId: DEVICE_ID1
+				clientId: DEVICE_ID1,
+				protocolId: 'MQTT',
+				protocolVersion: 4,
+				username: USER,
+				password: PASSWORD
 			});
 
 			mqttClient2 = mqtt.connect('mqtt://localhost' + ':' + PORT, {
-				clientId: DEVICE_ID2
+				clientId: DEVICE_ID2,
+				protocolId: 'MQTT',
+				protocolVersion: 4,
+				username: USER,
+				password: PASSWORD
 			});
 
 			async.parallel([
@@ -84,36 +97,23 @@ describe('Gateway', function () {
 	describe('#clients', function () {
 		it('should relay messages', function (done) {
 			mqttClient1.once('message', function (topic, message) {
-				should.equal('reekoh/data', topic);
-				should.equal('Sample Data', message.toString());
+				message = JSON.parse(message);
+
+				should.equal(TOPIC, topic);
+				should.equal(message.id, '15819', 'ID validation failed.');
+				should.equal(message.id_wasp, 'AGP_2', 'Wasp ID validation failed.');
+				should.equal(message.id_secret, '400577471', 'Secret ID validation failed.');
+				should.equal(message.sensor, 'SOIL_D', 'Sensor ID validation failed.');
+				should.equal(message.value, '52.48', 'Sensor Value validation failed.');
+				should.equal(message.datetime, '2016-01-28T12:29:11+10:00', 'Reading date/time validation failed.');
 
 				return done();
 			});
 
-			mqttClient1.subscribe(['reekoh/data', DEVICE_ID1], function (error) {
+			mqttClient1.subscribe([TOPIC, DEVICE_ID1], function (error) {
 				should.ifError(error);
 
-				mqttClient2.publish('reekoh/data', 'Sample Data');
-			});
-		});
-	});
-
-	describe('#message', function () {
-		it('should process the message and send it to the client', function (done) {
-			mqttClient1.once('message', function (topic, message) {
-				should.equal(DEVICE_ID1, topic);
-				should.equal('Sample Command', message.toString());
-
-				return done();
-			});
-
-			mqttGateway.send({
-				type: 'message',
-				data: {
-					device: DEVICE_ID1,
-					messageId: '55fce1455167c470abeedae2',
-					message: 'Sample Command'
-				}
+				mqttClient2.publish(TOPIC, '{"id":"15819","id_wasp":"AGP_2","id_secret":"400577471","sensor":"SOIL_D","value":"52.48","datetime":"2016-01-28T12:29:11+10:00"}');
 			});
 		});
 	});
