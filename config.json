@@ -1,20 +1,20 @@
 {
-  "topic": {
-	"type": "String",
-	"label": "Topic",
-	"default": "libelium/data",
-	"help": "The topic to listen to for device data. Default libelium/data"
-  },
   "user": {
 	"type": "String",
 	"label": "Username",
-	"requied": true,
+	"required": true,
 	"help": "The username to use to authenticate incoming traffic."
   },
   "password": {
 	"type": "Password",
 	"label": "Password",
-	"requied": true,
+	"required": true,
 	"help": "The password to use to authenticate incoming traffic."
+  },
+  "topic": {
+	"type": "String",
+	"label": "Topic",
+	"default": "libelium/data",
+	"help": "(Optional) The topic to listen to for device data. Default libelium/data"
   }
 }

@@ -5,53 +5,41 @@ var isEmpty           = require('lodash.isempty'),
 	authorizedDevices = {},
 	server, port;
 
-/*
- * When a new device is added, add it to the list of authorized devices.
- */
 platform.on('adddevice', function (device) {
 	if (!isEmpty(device) && !isEmpty(device._id)) {
 		authorizedDevices[device._id] = device;
-		platform.log('Successfully added ' + device._id + ' to the pool of authorized devices.');
+		platform.log(`Successfully added ${device._id} to the pool of authorized devices.`);
 	}
 	else
-		platform.handleException(new Error('Device data invalid. Device not added. ' + device));
+		platform.handleException(new Error(`Device data invalid. Device not added. ${device}`));
 });
 
-/*
- * When a device is removed or deleted, remove it from the list of authorized devices.
- */
 platform.on('removedevice', function (device) {
 	if (!isEmpty(device) && !isEmpty(device._id)) {
 		delete authorizedDevices[device._id];
-		platform.log('Successfully removed ' + device._id + ' from the pool of authorized devices.');
+		platform.log(`Successfully removed ${device._id}from the pool of authorized devices.`);
 	}
 	else
-		platform.handleException(new Error('Device data invalid. Device not removed. ' + device));
+		platform.handleException(new Error(`Device data invalid. Device not removed. ${device}`));
 });
 
-/*
- * Event to listen to in order to gracefully release all resources bound to this service.
- */
 platform.on('close', function () {
 	let d = require('domain').create();
 
-	d.once('error', function (error) {
-		console.error('Error closing Meshlium Gateway on port ' + port, error);
+	d.once('error', (error) => {
+		console.error(`Error closing Meshlium Gateway on port ${port}`, error);
 		platform.handleException(error);
 		platform.notifyClose();
 		d.exit();
 	});
 
-	d.run(function () {
-		server.close();
-		console.log('Meshlium Gateway closed on port ' + port);
-		d.exit();
+	d.run(() => {
+		server.close(() => {
+			d.exit();
+		});
 	});
 });
 
-/*
- * Listen for the ready event.
- */
 platform.once('ready', function (options, registeredDevices) {
 	var keyBy  = require('lodash.keyby'),
 		mosca  = require('mosca'),
@@ -68,7 +56,7 @@ platform.once('ready', function (options, registeredDevices) {
 		port: port
 	});
 
-	server.on('published', function (message, client) {
+	server.on('published', (message, client) => {
 		if (message.topic === topic) {
 			let d = domain.create();
 
@@ -107,11 +95,12 @@ platform.once('ready', function (options, registeredDevices) {
 		}
 	});
 
-	server.on('closed', function () {
+	server.on('closed', () => {
+		console.log(`Meshlium Gateway closed on port ${port}`);
 		platform.notifyClose();
 	});
 
-	server.on('error', function (error) {
+	server.on('error', (error) => {
 		console.error('Server Error', error);
 		platform.handleException(error);
 
@@ -119,8 +108,8 @@ platform.once('ready', function (options, registeredDevices) {
 			process.exit(1);
 	});
 
-	server.on('ready', function () {
-		server.authenticate = function (client, username, password, callback) {
+	server.on('ready', () => {
+		server.authenticate = (client, username, password, callback) => {
 			username = (!isEmpty(username)) ? username.toString() : '';
 			password = (!isEmpty(password)) ? password.toString() : '';
 
@@ -132,7 +121,7 @@ platform.once('ready', function (options, registeredDevices) {
 				return callback(null, true);
 		};
 
-		platform.log('Meshlium Gateway initialized on port ' + port);
+		platform.log(`Meshlium Gateway initialized on port ${port}`);
 		platform.notifyReady();
 	});
 });
