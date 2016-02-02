@@ -113,17 +113,19 @@ platform.once('ready', function (options, registeredDevices) {
 	});
 
 	server.on('ready', () => {
-		server.authenticate = (client, username, password, callback) => {
-			username = (!isEmpty(username)) ? username.toString() : '';
-			password = (!isEmpty(password)) ? password.toString() : '';
+		if (!isEmpty(options.user) && !isEmpty(options.password)) {
+			server.authenticate = (client, username, password, callback) => {
+				username = (!isEmpty(username)) ? username.toString() : '';
+				password = (!isEmpty(password)) ? password.toString() : '';
 
-			if (options.user !== username || options.password !== password) {
-				platform.log(`Meshlium Gateway - Authentication Failed on Client: ${(!isEmpty(client)) ? client.id : 'No Client ID'}.`);
-				callback(null, false);
-			}
-			else
-				return callback(null, true);
-		};
+				if (options.user === username && options.password === password)
+					return callback(null, true);
+				else {
+					platform.log(`MQTT Gateway - Authentication Failed on Client: ${(!isEmpty(client)) ? client.id : 'No Client ID'}.`);
+					callback(null, false);
+				}
+			};
+		}
 
 		platform.log(`Meshlium Gateway initialized on port ${port}`);
 		platform.notifyReady();

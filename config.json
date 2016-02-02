@@ -2,14 +2,12 @@
   "user": {
 	"type": "String",
 	"label": "Username",
-	"required": true,
-	"help": "The username to use to authenticate incoming traffic."
+	"help": "(Optional) The username to use if you want to authenticate incoming traffic."
   },
   "password": {
 	"type": "Password",
 	"label": "Password",
-	"required": true,
-	"help": "The password to use to authenticate incoming traffic."
+	"help": "(Optional) The password to use if you want to authenticate incoming traffic."
   },
   "topic": {
 	"type": "String",
