@@ -61,8 +61,8 @@ platform.once('ready', function (options, registeredDevices) {
 			let d = domain.create();
 
 
-			d.once('error', (error) => {
-				platform.handleException(error);
+			d.once('error', () => {
+				platform.handleException(new Error(`Invalid data sent. Data must be a valid JSON String. Please upgrade your Meshlium Firmware. Raw Data: ${message.payload.toString()}`));
 
 				d.exit();
 			});
@@ -71,11 +71,15 @@ platform.once('ready', function (options, registeredDevices) {
 				let msg = message.payload.toString(),
 					obj = JSON.parse(msg);
 
-				if (isEmpty(obj.id_wasp)) return d.exit();
+				if (isEmpty(obj.id_wasp)) {
+					platform.handleException(new Error(`Invalid data sent. Data must be a valid JSON String with at least an "id_wasp" field which corresponds to a registered Device ID. Raw Data: ${msg}`));
+
+					return d.exit();
+				}
 
 				if (isEmpty(authorizedDevices[obj.id_wasp])) {
 					platform.log(JSON.stringify({
-						title: 'Unauthorized Device',
+						title: 'Meshlium Gateway - Unauthorized Device',
 						device: obj.id_wasp
 					}));
 
@@ -85,7 +89,7 @@ platform.once('ready', function (options, registeredDevices) {
 				platform.processData(obj.id_wasp, msg);
 
 				platform.log(JSON.stringify({
-					title: 'Meshlium Data Received.',
+					title: 'Meshlium Gateway - Data Received.',
 					device: client.id,
 					data: obj
 				}));
@@ -101,7 +105,7 @@ platform.once('ready', function (options, registeredDevices) {
 	});
 
 	server.on('error', (error) => {
-		console.error('Server Error', error);
+		console.error('Meshlium Gateway - Server Error', error);
 		platform.handleException(error);
 
 		if (error.code === 'EADDRINUSE')
@@ -109,17 +113,19 @@ platform.once('ready', function (options, registeredDevices) {
 	});
 
 	server.on('ready', () => {
-		server.authenticate = (client, username, password, callback) => {
-			username = (!isEmpty(username)) ? username.toString() : '';
-			password = (!isEmpty(password)) ? password.toString() : '';
+		if (!isEmpty(options.user) && !isEmpty(options.password)) {
+			server.authenticate = (client, username, password, callback) => {
+				username = (!isEmpty(username)) ? username.toString() : '';
+				password = (!isEmpty(password)) ? password.toString() : '';
 
-			if (options.user !== username || options.password !== password) {
-				platform.log(`Authentication Failed on Client: ${(!isEmpty(client)) ? client.id : 'No Client ID'}.`);
-				callback(null, false);
-			}
-			else
-				return callback(null, true);
-		};
+				if (options.user === username && options.password === password)
+					return callback(null, true);
+				else {
+					platform.log(`MQTT Gateway - Authentication Failed on Client: ${(!isEmpty(client)) ? client.id : 'No Client ID'}.`);
+					callback(null, false);
+				}
+			};
+		}
 
 		platform.log(`Meshlium Gateway initialized on port ${port}`);
 		platform.notifyReady();
