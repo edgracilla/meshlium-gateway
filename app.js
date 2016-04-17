@@ -1,6 +1,7 @@
 'use strict';
 
-var isEmpty           = require('lodash.isempty'),
+var domain            = require('domain'),
+	isEmpty           = require('lodash.isempty'),
 	platform          = require('./platform'),
 	authorizedDevices = {},
 	server, port;
@@ -24,16 +25,16 @@ platform.on('removedevice', function (device) {
 });
 
 platform.on('close', function () {
-	let d = require('domain').create();
+	let d = domain.create();
 
-	d.once('error', (error) => {
+	d.once('error', function (error) {
 		console.error(`Error closing Meshlium Gateway on port ${port}`, error);
 		platform.handleException(error);
 		platform.notifyClose();
 		d.exit();
 	});
 
-	d.run(() => {
+	d.run(function () {
 		server.close(() => {
 			d.exit();
 		});
@@ -43,7 +44,6 @@ platform.on('close', function () {
 platform.once('ready', function (options, registeredDevices) {
 	var keyBy  = require('lodash.keyby'),
 		mosca  = require('mosca'),
-		domain = require('domain'),
 		config = require('./config.json');
 
 	if (!isEmpty(registeredDevices))
@@ -60,14 +60,13 @@ platform.once('ready', function (options, registeredDevices) {
 		if (message.topic === topic) {
 			let d = domain.create();
 
-
-			d.once('error', () => {
+			d.once('error', function () {
 				platform.handleException(new Error(`Invalid data sent. Data must be a valid JSON String. Please upgrade your Meshlium Firmware. Raw Data: ${message.payload.toString()}`));
 
 				d.exit();
 			});
 
-			d.run(() => {
+			d.run(function () {
 				let msg = message.payload.toString(),
 					obj = JSON.parse(msg);
 
@@ -121,7 +120,7 @@ platform.once('ready', function (options, registeredDevices) {
 				if (options.user === username && options.password === password)
 					return callback(null, true);
 				else {
-					platform.log(`MQTT Gateway - Authentication Failed on Client: ${(!isEmpty(client)) ? client.id : 'No Client ID'}.`);
+					platform.log(`Meshlium Gateway - Authentication Failed on Client: ${(!isEmpty(client)) ? client.id : 'No Client ID'}.`);
 					callback(null, false);
 				}
 			};
