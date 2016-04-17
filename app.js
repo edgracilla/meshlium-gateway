@@ -1,6 +1,6 @@
 'use strict';
 
-var domain            = require('domain'),
+var async             = require('async'),
 	isEmpty           = require('lodash.isempty'),
 	platform          = require('./platform'),
 	authorizedDevices = {},
@@ -25,7 +25,7 @@ platform.on('removedevice', function (device) {
 });
 
 platform.on('close', function () {
-	let d = domain.create();
+	let d = require('domain').create();
 
 	d.once('error', function (error) {
 		console.error(`Error closing Meshlium Gateway on port ${port}`, error);
@@ -58,31 +58,19 @@ platform.once('ready', function (options, registeredDevices) {
 
 	server.on('published', (message, client) => {
 		if (message.topic === topic) {
-			let d = domain.create();
+			let msg = message.payload.toString();
 
-			d.once('error', function () {
-				platform.handleException(new Error(`Invalid data sent. Data must be a valid JSON String. Please upgrade your Meshlium Firmware. Raw Data: ${message.payload.toString()}`));
-
-				d.exit();
-			});
-
-			d.run(function () {
-				let msg = message.payload.toString(),
-					obj = JSON.parse(msg);
-
-				if (isEmpty(obj.id_wasp)) {
-					platform.handleException(new Error(`Invalid data sent. Data must be a valid JSON String with at least an "id_wasp" field which corresponds to a registered Device ID. Raw Data: ${msg}`));
-
-					return d.exit();
-				}
+			async.waterfall([
+				async.constant(msg),
+				async.asyncify(JSON.parse)
+			], (error, obj) => {
+				if (error || isEmpty(obj.id_wasp)) return platform.handleException(new Error(`Invalid data sent. Data must be a valid JSON String with at least an "id_wasp" field which corresponds to a registered Device ID. Raw Data: ${msg}`));
 
 				if (isEmpty(authorizedDevices[obj.id_wasp])) {
-					platform.log(JSON.stringify({
+					return platform.log(JSON.stringify({
 						title: 'Meshlium Gateway - Unauthorized Device',
 						device: obj.id_wasp
 					}));
-
-					return d.exit();
 				}
 
 				platform.processData(obj.id_wasp, msg);
@@ -92,8 +80,6 @@ platform.once('ready', function (options, registeredDevices) {
 					device: client.id,
 					data: obj
 				}));
-
-				d.exit();
 			});
 		}
 	});

@@ -12,6 +12,7 @@
     "url": "https://github.com/Reekoh/meshlium-gateway"
   },
   "dependencies": {
+    "async": "^1.5.2",
     "lodash.isempty": "^4.2.1",
     "lodash.keyby": "^4.3.0",
     "mosca": "^1.2.0"
