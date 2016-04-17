@@ -61,7 +61,7 @@ platform.once('ready', function (options, registeredDevices) {
 			let msg = message.payload.toString();
 
 			async.waterfall([
-				async.constant(msg),
+				async.constant(msg || '{}'),
 				async.asyncify(JSON.parse)
 			], (error, obj) => {
 				if (error || isEmpty(obj.id_wasp)) return platform.handleException(new Error(`Invalid data sent. Data must be a valid JSON String with at least an "id_wasp" field which corresponds to a registered Device ID. Raw Data: ${msg}`));
