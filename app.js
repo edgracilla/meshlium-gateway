@@ -1,28 +1,9 @@
 'use strict';
 
-var async             = require('async'),
-	isEmpty           = require('lodash.isempty'),
-	platform          = require('./platform'),
-	authorizedDevices = {},
+var async    = require('async'),
+	isEmpty  = require('lodash.isempty'),
+	platform = require('./platform'),
 	server, port;
-
-platform.on('adddevice', function (device) {
-	if (!isEmpty(device) && !isEmpty(device._id)) {
-		authorizedDevices[device._id] = device;
-		platform.log(`Successfully added ${device._id} to the pool of authorized devices.`);
-	}
-	else
-		platform.handleException(new Error(`Device data invalid. Device not added. ${device}`));
-});
-
-platform.on('removedevice', function (device) {
-	if (!isEmpty(device) && !isEmpty(device._id)) {
-		delete authorizedDevices[device._id];
-		platform.log(`Successfully removed ${device._id}from the pool of authorized devices.`);
-	}
-	else
-		platform.handleException(new Error(`Device data invalid. Device not removed. ${device}`));
-});
 
 platform.on('close', function () {
 	let d = require('domain').create();
@@ -41,15 +22,12 @@ platform.on('close', function () {
 	});
 });
 
-platform.once('ready', function (options, registeredDevices) {
-	var keyBy  = require('lodash.keyby'),
+platform.once('ready', function (options) {
+	let get    = require('lodash.get'),
 		mosca  = require('mosca'),
 		config = require('./config.json');
 
-	if (!isEmpty(registeredDevices))
-		authorizedDevices = keyBy(registeredDevices, '_id');
-
-	var topic = options.topic || config.topic.default;
+	let topic = options.topic || config.topic.default;
 
 	port = options.port;
 	server = new mosca.Server({
@@ -66,20 +44,33 @@ platform.once('ready', function (options, registeredDevices) {
 			], (error, obj) => {
 				if (error || isEmpty(obj.id_wasp)) return platform.handleException(new Error(`Invalid data sent. Data must be a valid JSON String with at least an "id_wasp" field which corresponds to a registered Device ID. Raw Data: ${msg}`));
 
-				if (isEmpty(authorizedDevices[obj.id_wasp])) {
-					return platform.log(JSON.stringify({
-						title: 'Meshlium Gateway - Unauthorized Device',
-						device: obj.id_wasp
-					}));
-				}
+				platform.requestDeviceInfo(obj.id_wasp, (error, requestId) => {
+					setTimeout(() => {
+						platform.removeAllListeners(requestId);
+					}, 5000);
 
-				platform.processData(obj.id_wasp, msg);
+					platform.once(requestId, (deviceInfo) => {
+						if (isEmpty(deviceInfo)) {
+							return platform.log(JSON.stringify({
+								title: 'Meshlium Gateway - Unauthorized Device',
+								device: obj.id_wasp
+							}));
+						}
 
-				platform.log(JSON.stringify({
-					title: 'Meshlium Gateway - Data Received.',
-					device: client.id,
-					data: obj
-				}));
+						platform.setDeviceState(deviceInfo._id, {
+							current_reading: obj,
+							previous_reading: get(deviceInfo, 'state.current_reading') || {}
+						}, function () {
+							platform.processData(obj.id_wasp, msg);
+
+							platform.log(JSON.stringify({
+								title: 'Meshlium Gateway - Data Received.',
+								device: client.id,
+								data: obj
+							}));
+						});
+					});
+				});
 			});
 		}
 	});
