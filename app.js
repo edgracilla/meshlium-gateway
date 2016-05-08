@@ -45,11 +45,13 @@ platform.once('ready', function (options) {
 				if (error || isEmpty(obj.id_wasp)) return platform.handleException(new Error(`Invalid data sent. Data must be a valid JSON String with at least an "id_wasp" field which corresponds to a registered Device ID. Raw Data: ${msg}`));
 
 				platform.requestDeviceInfo(obj.id_wasp, (error, requestId) => {
-					setTimeout(() => {
+					let t = setTimeout(() => {
 						platform.removeAllListeners(requestId);
 					}, 5000);
 
 					platform.once(requestId, (deviceInfo) => {
+						clearTimeout(t);
+
 						if (isEmpty(deviceInfo)) {
 							return platform.log(JSON.stringify({
 								title: 'Meshlium Gateway - Unauthorized Device',
