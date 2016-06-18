@@ -85,9 +85,6 @@ platform.once('ready', function (options) {
 	server.on('error', (error) => {
 		console.error('Meshlium Gateway - Server Error', error);
 		platform.handleException(error);
-
-		if (error.code === 'EADDRINUSE')
-			process.exit(1);
 	});
 
 	server.on('ready', () => {
