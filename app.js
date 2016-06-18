@@ -34,6 +34,16 @@ platform.once('ready', function (options) {
 		port: port
 	});
 
+	server.on('clientConnected', (client) => {
+		platform.log(`Meshlium Gateway Device Connection received. Device ID: ${client.id}`);
+		platform.notifyConnection(client.id);
+	});
+
+	server.on('clientDisconnected', (client) => {
+		platform.log(`Meshlium Gateway Device Disconnection received. Device ID: ${client.id}`);
+		platform.notifyDisconnection(client.id);
+	});
+
 	server.on('published', (message, client) => {
 		if (message.topic === topic) {
 			let msg = message.payload.toString();
