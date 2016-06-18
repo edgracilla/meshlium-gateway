@@ -13,9 +13,9 @@
   },
   "dependencies": {
     "async": "^1.5.2",
-    "lodash.get": "^4.2.1",
+    "lodash.get": "^4.3.0",
     "lodash.isempty": "^4.2.1",
-    "mosca": "^1.2.0"
+    "mosca": "^1.4.1"
   },
   "devDependencies": {
     "async": "^1.5.2",
