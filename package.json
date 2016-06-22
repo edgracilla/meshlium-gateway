@@ -1,7 +1,7 @@
 {
   "name": "meshlium-gateway",
   "description": "Meshlium Gateway Plugin for the Reekoh IoT Platform. Enables the platform to ingest data for Libelium's Meshlium via MQTT Protocol.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Reekoh, Inc.",
   "main": "app.js",
   "scripts": {
@@ -18,16 +18,15 @@
     "mosca": "^1.4.1"
   },
   "devDependencies": {
-    "async": "^1.5.2",
     "gulp": "^3.9.1",
     "gulp-cli": "^1.2.1",
-    "gulp-jshint": "^2.0.0",
+    "gulp-jshint": "^2.0.1",
     "gulp-json-lint": "^0.1.0",
     "gulp-mocha": "^2.2.0",
     "gulp-plumber": "^1.1.0",
-    "mocha": "^2.4.5",
-    "mqtt": "^1.8.0",
-    "should": "^8.2.1"
+    "mocha": "^2.5.3",
+    "mqtt": "^1.11.2",
+    "should": "^9.0.2"
   },
   "license": "LGPL-3.0"
 }
