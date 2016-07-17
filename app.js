@@ -65,7 +65,7 @@ platform.once('ready', function (options) {
 		platform.notifyReady();
 	});
 
-	server.on('closed', () => {
+	server.once('closed', () => {
 		console.log(`Meshlium Gateway closed on port ${options.port}`);
 	});
 
