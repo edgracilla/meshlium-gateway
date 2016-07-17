@@ -3,13 +3,12 @@
 var async    = require('async'),
 	isEmpty  = require('lodash.isempty'),
 	platform = require('./platform'),
-	server, port;
+	server;
 
 platform.on('close', function () {
 	let d = require('domain').create();
 
 	d.once('error', function (error) {
-		console.error(`Error closing Meshlium Gateway on port ${port}`, error);
 		platform.handleException(error);
 		platform.notifyClose();
 		d.exit();
@@ -17,6 +16,8 @@ platform.on('close', function () {
 
 	d.run(function () {
 		server.close(() => {
+			server.removeAllListeners();
+			platform.notifyClose();
 			d.exit();
 		});
 	});
@@ -29,9 +30,43 @@ platform.once('ready', function (options) {
 
 	let topic = options.topic || config.topic.default;
 
-	port = options.port;
 	server = new mosca.Server({
-		port: port
+		port: options.port
+	});
+
+	server.once('error', (error) => {
+		console.error('Meshlium Gateway - Server Error', error);
+		platform.handleException(error);
+
+		setTimeout(() => {
+			server.close(() => {
+				server.removeAllListeners();
+				process.exit();
+			});
+		}, 5000);
+	});
+
+	server.once('ready', () => {
+		if (!isEmpty(options.user) && !isEmpty(options.password)) {
+			server.authenticate = (client, username, password, callback) => {
+				username = (!isEmpty(username)) ? username.toString() : '';
+				password = (!isEmpty(password)) ? password.toString() : '';
+
+				if (options.user === username && options.password === password)
+					return callback(null, true);
+				else {
+					platform.log(`Meshlium Gateway - Authentication Failed on Client: ${(!isEmpty(client)) ? client.id : 'No Client ID'}.`);
+					callback(null, false);
+				}
+			};
+		}
+
+		platform.log(`Meshlium Gateway initialized on port ${options.port}`);
+		platform.notifyReady();
+	});
+
+	server.on('closed', () => {
+		console.log(`Meshlium Gateway closed on port ${options.port}`);
 	});
 
 	server.on('clientConnected', (client) => {
@@ -79,34 +114,5 @@ platform.once('ready', function (options) {
 				});
 			});
 		}
-	});
-
-	server.on('closed', () => {
-		console.log(`Meshlium Gateway closed on port ${port}`);
-		platform.notifyClose();
-	});
-
-	server.on('error', (error) => {
-		console.error('Meshlium Gateway - Server Error', error);
-		platform.handleException(error);
-	});
-
-	server.on('ready', () => {
-		if (!isEmpty(options.user) && !isEmpty(options.password)) {
-			server.authenticate = (client, username, password, callback) => {
-				username = (!isEmpty(username)) ? username.toString() : '';
-				password = (!isEmpty(password)) ? password.toString() : '';
-
-				if (options.user === username && options.password === password)
-					return callback(null, true);
-				else {
-					platform.log(`Meshlium Gateway - Authentication Failed on Client: ${(!isEmpty(client)) ? client.id : 'No Client ID'}.`);
-					callback(null, false);
-				}
-			};
-		}
-
-		platform.log(`Meshlium Gateway initialized on port ${port}`);
-		platform.notifyReady();
 	});
 });
