@@ -1,120 +1,158 @@
-'use strict';
+/* global describe, it, after, before */
+'use strict'
 
-const PORT       = 8000,
-	  TOPIC      = 'hello/world',
-	  USER       = 'hello',
-	  PASSWORD   = 'world',
-	  DEVICE_ID1 = 'AGP_1',
-	  DEVICE_ID2 = 'AGP_2';
+const mqtt = require('mqtt')
+const async = require('async')
+const should = require('should')
 
-var cp     = require('child_process'),
-	mqtt   = require('mqtt'),
-	async  = require('async'),
-	should = require('should'),
-	mqttGateway, mqttClient1, mqttClient2;
+const PORT = 8182
+const PLUGIN_ID = 'demo.gateway'
+const BROKER = 'amqp://guest:guest@127.0.0.1/'
+const OUTPUT_PIPES = 'demo.outpipe1,demo.outpipe2'
+const COMMAND_RELAYS = 'demo.relay1,demo.relay2'
 
-describe('Gateway', function () {
-	this.slow(5000);
+const Broker = require('../node_modules/reekoh/lib/broker.lib')
 
-	after('terminate child process', function () {
-		this.timeout(5000);
+let conf = {
+  port: PORT,
+  user: 'hello',
+  password: 'world',
+  deviceId1: 'AGP_1',
+  deviceId2: 'AGP_2',
+  topic: 'hello/world'
+}
 
-		mqttClient1.end(true);
-		mqttClient2.end(true);
+let _app = null
+let _broker = null
 
-		mqttGateway.send({
-			type: 'close'
-		});
+let mqttGateway = null
+let mqttClient1 = null
+let mqttClient2 = null
 
-		setTimeout(function () {
-			mqttGateway.kill('SIGKILL');
-		}, 4500);
-	});
+describe('Meshlium Gateway', () => {
+  before('init', () => {
+    process.env.BROKER = BROKER
+    process.env.PLUGIN_ID = PLUGIN_ID
+    process.env.OUTPUT_PIPES = OUTPUT_PIPES
+    process.env.COMMAND_RELAYS = COMMAND_RELAYS
+    process.env.CONFIG = JSON.stringify(conf)
 
-	describe('#spawn', function () {
-		it('should spawn a child process', function () {
-			should.ok(mqttGateway = cp.fork(process.cwd()), 'Child process not spawned.');
-		});
-	});
+    _broker = new Broker()
+  })
 
-	describe('#handShake', function () {
-		it('should notify the parent process when ready within 5 seconds', function (done) {
-			this.timeout(5000);
+  after('terminate', function () {
+    // mqttClient1.end(true)
+    // mqttClient2.end(true)
 
-			mqttGateway.on('message', function (message) {
-				if (message.type === 'ready')
-					done();
-			});
+    // mqttGateway.send({
+    //   type: 'close'
+    // })
 
-			mqttGateway.send({
-				type: 'ready',
-				data: {
-					options: {
-						port: PORT,
-						topic: TOPIC,
-						user: USER,
-						password: PASSWORD
-					},
-					devices: [{_id: DEVICE_ID1}, {_id: DEVICE_ID2}]
-				}
-			}, function (error) {
-				should.ifError(error);
-			});
-		});
-	});
+    setTimeout(function () {
+      mqttGateway.kill('SIGKILL')
+    }, 4500)
+  })
 
-	describe('#connections', function () {
-		it('should accept connections', function (done) {
-			mqttClient1 = mqtt.connect('mqtt://localhost' + ':' + PORT, {
-				clientId: DEVICE_ID1,
-				protocolId: 'MQTT',
-				protocolVersion: 4,
-				username: USER,
-				password: PASSWORD
-			});
+  describe('#start', function () {
+    it('should start the app', function (done) {
+      this.timeout(10000)
+      _app = require('../app')
+      _app.once('init', done)
+    })
+  })
 
-			mqttClient2 = mqtt.connect('mqtt://localhost' + ':' + PORT, {
-				clientId: DEVICE_ID2,
-				protocolId: 'MQTT',
-				protocolVersion: 4,
-				username: USER,
-				password: PASSWORD
-			});
+  describe('#test RPC preparation', () => {
+    it('should connect to broker', (done) => {
+      _broker.connect(BROKER).then(() => {
+        return done() || null
+      }).catch((err) => {
+        done(err)
+      })
+    })
 
-			async.parallel([
-				function (cb) {
-					mqttClient1.on('connect', cb);
-				},
-				function (cb) {
-					mqttClient2.on('connect', cb);
-				}
-			], function () {
-				done();
-			});
-		});
-	});
+    it('should spawn temporary RPC server', (done) => {
+      // if request arrives this proc will be called
+      let sampleServerProcedure = (msg) => {
+        // console.log(msg.content.toString('utf8'))
+        return new Promise((resolve, reject) => {
+          async.waterfall([
+            async.constant(msg.content.toString('utf8')),
+            async.asyncify(JSON.parse)
+          ], (err, parsed) => {
+            if (err) return reject(err)
+            parsed.foo = 'bar'
+            resolve(JSON.stringify(parsed))
+          })
+        })
+      }
 
-	describe('#clients', function () {
-		it('should relay messages', function (done) {
-			mqttClient1.once('message', function (topic, message) {
-				message = JSON.parse(message);
+      _broker.createRPC('server', 'deviceinfo').then((queue) => {
+        return queue.serverConsume(sampleServerProcedure)
+      }).then(() => {
+        // Awaiting RPC requests
+        done()
+      }).catch((err) => {
+        done(err)
+      })
+    })
+  })
 
-				should.equal(TOPIC, topic);
-				should.equal(message.id, '15819', 'ID validation failed.');
-				should.equal(message.id_wasp, 'AGP_2', 'Wasp ID validation failed.');
-				should.equal(message.id_secret, '400577471', 'Secret ID validation failed.');
-				should.equal(message.sensor, 'SOIL_D', 'Sensor ID validation failed.');
-				should.equal(message.value, '52.48', 'Sensor Value validation failed.');
-				should.equal(message.datetime, '2016-01-28T12:29:11+10:00', 'Reading date/time validation failed.');
+  describe('#connections', function () {
+    it('should accept connections', function (done) {
+      mqttClient1 = mqtt.connect('mqtt://localhost' + ':' + PORT, {
+        clientId: conf.deviceId1,
+        protocolId: 'MQTT',
+        protocolVersion: 4,
+        username: conf.user,
+        password: conf.password
+      })
 
-				return done();
-			});
+      mqttClient2 = mqtt.connect('mqtt://localhost' + ':' + PORT, {
+        clientId: conf.deviceId2,
+        protocolId: 'MQTT',
+        protocolVersion: 4,
+        username: conf.user,
+        password: conf.password
+      })
 
-			mqttClient1.subscribe([TOPIC, DEVICE_ID1], function (error) {
-				should.ifError(error);
+      async.parallel([
+        function (cb) {
+          mqttClient1.on('connect', cb)
+        },
+        function (cb) {
+          mqttClient2.on('connect', cb)
+        }
+      ], function () {
+        done()
+      })
+    })
+  })
 
-				mqttClient2.publish(TOPIC, '{"id":"15819","id_wasp":"AGP_2","id_secret":"400577471","sensor":"SOIL_D","value":"52.48","datetime":"2016-01-28T12:29:11+10:00"}');
-			});
-		});
-	});
-});
+  describe('#clients', function () {
+    it('should relay messages', function (done) {
+
+      mqttClient1.once('message', function (topic, message) {
+        message = JSON.parse(message)
+
+        should.equal(conf.topic, topic)
+        should.equal(message.id, '15819', 'ID validation failed.')
+        should.equal(message.id_wasp, 'AGP_2', 'Wasp ID validation failed.')
+        should.equal(message.id_secret, '400577471', 'Secret ID validation failed.')
+        should.equal(message.sensor, 'SOIL_D', 'Sensor ID validation failed.')
+        should.equal(message.value, '52.48', 'Sensor Value validation failed.')
+        should.equal(message.datetime, '2016-01-28T12:29:11+10:00', 'Reading date/time validation failed.')
+
+        return done()
+      })
+
+      mqttClient1.subscribe([conf.topic, conf.deviceId1], function (error) {
+        should.ifError(error)
+        mqttClient2.publish(conf.topic, '{"id":"15819","id_wasp":"AGP_2","id_secret":"400577471","sensor":"SOIL_D","value":"52.48","datetime":"2016-01-28T12:29:11+10:00"}')
+      })
+    })
+
+    it('should be piped to platform', function (done) {
+      _app.on('piped', done)
+    })
+  })
+})
